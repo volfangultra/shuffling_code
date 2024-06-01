@@ -1,0 +1,6 @@
+Program(input1, input2, output)
+    a = input1 * input1
+    b = input2 * input2
+    c = a * input2 + b
+    d = b * input1 + a
+    output = input1 * c + b
