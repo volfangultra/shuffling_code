@@ -3,6 +3,17 @@
 #include <string>
 
 using namespace std;
+
+bool cmp(pair<string, tuple<int, vector<string>, string, vector<string>>>& a, pair<string, tuple<int, vector<string>, string, vector<string>>>& b) { 
+    return get<LINIJA>(a.second) < get<LINIJA>(b.second); 
+};
+
+ostream& operator<<(ostream& ispis, pair<string, pair<int, int>> par){
+    ispis << par.first << " : (" << par.second.first << ", " << par.second.second << ")";;
+    return ispis;
+}
+
+
 template<typename Tip>
 ostream& operator<<(ostream& ispis, vector<Tip> v){
     for(auto el:v)
@@ -17,9 +28,19 @@ ostream& operator<<(ostream& ispis, vector<vector<Tip>> v){
     return ispis;
 }
 
-ostream& operator<<(ostream& ispis, map<string, tuple<int, vector<string>, string, vector<string>> > linije){
 
-    for(auto it = linije.begin(); it != linije.end(); it++){
+
+template<typename Tip>
+ostream& operator<<(ostream& ispis, pair<Tip, Tip> v){
+    ispis << "{" << v.first << ", " << v.second << "}";
+    return ispis;
+}
+
+ostream& operator<<(ostream& ispis, map<string, tuple<int, vector<string>, string, vector<string>> > linije){
+    vector<pair<string, tuple<int, vector<string>, string, vector<string>>>> helper(linije.begin(), linije.end());
+    sort(helper.begin(), helper.end(), cmp);
+
+    for(auto it = helper.begin(); it != helper.end(); it++){
         ispis << "    " << get<LINIJA>(it->second) << ". " << it->first << " " << get<EKVIVALENCIJA>(it->second) << " ";
         for(int i = 0; i < get<OPERACIJE>(it->second).size(); i++)
             ispis << get<VARIJABLE>(it->second)[i] << " " << get<OPERACIJE>(it->second)[i] << " ";
@@ -57,6 +78,3 @@ void provjeri_granice(string& linija, int& i){
         throw "Syntax error";
 }
 
-ostream& operator<<(ostream& ispis, Program& program){
-    return ispis;
-}

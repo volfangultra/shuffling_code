@@ -2,7 +2,24 @@
 #include "help.cpp"
 using namespace std;
 
-void Program::ucitaj_liniju(string& linija, int broj_linije) {
+ostream& operator<<(ostream& ispis, Program& program){
+    ispis << program.ime << "(";
+    for(auto el: program.inputi)
+        ispis << el << ", ";
+    ispis << program.output << ")" << endl;
+    ispis << program.varijable;
+
+    return ispis;
+}
+
+bool Program::je_input(string& text){
+    for(auto el: inputi)
+        if(el == text)
+            return true;
+    return false;
+}
+
+void Program::ucitaj_liniju(string& linija, map<string, string>& mapa_transformacija, int broj_linije) {
     int i = 0;
     int kraj = linija.size();
     if(kraj == 0)
@@ -18,6 +35,15 @@ void Program::ucitaj_liniju(string& linija, int broj_linije) {
     }
     if(key == "")
         throw "Syntax error";
+
+    bool update = false;
+    string predhodni_key = key;
+    if(mapa_transformacija.find(key) != mapa_transformacija.end()){
+        key = mapa_transformacija[key] + "1";
+        update = true;
+    }
+    else
+        mapa_transformacija[key] = key;
 
     prodji_kroz_prazno(linija, i, kraj);
 
@@ -45,16 +71,27 @@ void Program::ucitaj_liniju(string& linija, int broj_linije) {
             simbol += linija[i];
             i++;
             if(i == kraj){
-                get<VARIJABLE>(varijable[key]).push_back(simbol);
-                return;
+                if(je_input(simbol))
+                    get<VARIJABLE>(varijable[key]).push_back(simbol);
+                else{
+                    if(mapa_transformacija.find(simbol) == mapa_transformacija.end()) throw "Syntax Error";
+                    get<VARIJABLE>(varijable[key]).push_back(mapa_transformacija[simbol]);
+                }
+
+                break;
             }
             provjeri_granice(linija, i);
         }
 
-        get<1>(varijable[key]).push_back(simbol);
+        if(je_input(simbol))
+            get<VARIJABLE>(varijable[key]).push_back(simbol);
+        else{
+            if(mapa_transformacija.find(simbol) == mapa_transformacija.end()) throw "Syntax Error";
+            get<VARIJABLE>(varijable[key]).push_back(mapa_transformacija[simbol]);
+        }
         prodji_kroz_prazno(linija, i, kraj);
         if(i == kraj)
-            return;
+            break;
 
 
         string operacija = "";
@@ -69,6 +106,10 @@ void Program::ucitaj_liniju(string& linija, int broj_linije) {
         prodji_kroz_prazno(linija, i, kraj);
 
     }
+
+    if(update)
+        mapa_transformacija[predhodni_key] = key;
+    
 }
 
 void Program::ucitaj_header(string& header){
@@ -115,30 +156,93 @@ void Program::ucitaj_header(string& header){
         i++;
 
     }
-    
+    output = temp;
 }
 
-Program::Program(string ime_fajla){
+bool mogu_se_zamjeniti(pair<string, pair<int, int>>& a, pair<string, pair<int, int>>& b, map<string, tuple<int, vector<string>, string, vector<string>> >& varijable){
+    int red_a = get<LINIJA>(varijable[a.first]);
+    int red_b = get<LINIJA>(varijable[b.first]);
+    return red_b > a.second.first && red_b < a.second.second && red_a > b.second.first && red_a < b.second.second;
+}
 
-    std::ifstream fajl(ime_fajla);
+void Program::pronadji_promjene(){
+    vector<pair<string, tuple<int, vector<string>, string, vector<string>>>> helper(varijable.begin(), varijable.end());
+    sort(helper.begin(), helper.end(), cmp);
 
-    if (!fajl.is_open())
-        throw "Unable to open file";
+    for (auto it = helper.begin(); it != helper.end() - 1; it++){
+        int prije_najkasnije = -1;
+        int poslije_najprije = helper.size();
+        int osnovna = get<LINIJA>(it->second);
 
-    string linija;
-    getline(fajl, linija);
-    ucitaj_header(linija);
-    cout << linija << endl;
+        for(auto varijabla: get<VARIJABLE>(it->second)){
+            if(!je_input(varijabla)){
+                int trenutno = get<LINIJA>(varijable[varijabla]);
+                if(trenutno < osnovna)
+                    prije_najkasnije = max(trenutno, prije_najkasnije);
+                else
+                    poslije_najprije = min(trenutno, poslije_najprije);
+            }
+        }
 
-    int broj_linije = 1;
-    while (getline(fajl, linija)){
-        ucitaj_liniju(linija, broj_linije);
-        broj_linije++;
+        zavisnosti.push_back({it->first, {prije_najkasnije, poslije_najprije}});
     }
 
-    broj_linija --;
-    cout << varijable;
+    for(int i = 0; i < zavisnosti.size(); i++){
+        for(int j = i + 1; j < zavisnosti.size(); j++){
+            if(mogu_se_zamjeniti(zavisnosti[i],zavisnosti[j], varijable))
+                moguce_promjene.push_back({zavisnosti[i].first, zavisnosti[j].first});
+        }
+    }
+}
 
 
-    fajl.close();
+
+
+Program::Program(string ime_fajla, bool file){
+    map<string, string> mapa_transformacija;
+    if(file){
+    ifstream fajl(ime_fajla);
+        if (!fajl.is_open())
+            throw "Unable to open file";
+
+        string linija;
+        getline(fajl, linija);
+        ucitaj_header(linija);
+
+        int broj_linije = 1;
+        while (getline(fajl, linija)){
+            ucitaj_liniju(linija, mapa_transformacija, broj_linije);
+            broj_linije++;
+        }
+
+        broj_linija --;
+
+        fajl.close();
+    } else{
+        istringstream iss(ime_fajla);
+        string linija;
+        getline(iss, linija);
+        ucitaj_header(linija);
+
+        int broj_linije = 1;
+        while (getline(iss, linija)){
+            ucitaj_liniju(linija, mapa_transformacija, broj_linije);
+            broj_linije++;
+        }
+
+        broj_linija --;
+    }
+
+
+    pronadji_promjene();
+}
+
+void Program::mjesaj(int broj_mjesanja, int seed){
+    for(int _ = 0; _ < broj_mjesanja; _++){
+        int index = rand()%moguce_promjene.size();
+        int broj_linije_prve = get<LINIJA>(varijable[moguce_promjene[index].first]);
+        int broj_linije_druge= get<LINIJA>(varijable[moguce_promjene[index].second]);
+        get<LINIJA>(varijable[moguce_promjene[index].first]) = broj_linije_druge;
+        get<LINIJA>(varijable[moguce_promjene[index].second]) = broj_linije_prve;
+    }
 }

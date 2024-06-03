@@ -5,6 +5,8 @@
 #include<map>
 #include <vector>
 #include <fstream>
+#include <sstream>
+#include <algorithm>
 
 using namespace std;
 
@@ -18,16 +20,22 @@ class Program{
     vector<string> inputi;
     string output;
     map<string, tuple<int, vector<string>, string, vector<string>> > varijable;
+
+    vector<pair<string, pair<int, int>>> zavisnosti;
+    vector<pair<string, string>> moguce_promjene;
+
     int broj_linija;
 
-    void ucitaj_liniju(string&, int);
+    void ucitaj_liniju(string&, map<string, string>&, int);
     void ucitaj_header(string&);
+    bool je_input(string&);
+    void pronadji_promjene();
 
     public:
     Program();
-    Program(string);
+    Program(string, bool file = true);
 
-    void mjesaj(int);
+    void mjesaj(int jacina, int seed=42);
     int get_broj_linija(){return broj_linija;};
 
     friend ostream& operator<<(ostream&, Program&);
